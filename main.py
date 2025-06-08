@@ -1,66 +1,91 @@
 import math
 
-# Menghitung entropy dataset
+# Fungsi untuk menghitung entropy dari data
 def entropy(data):
-    total = len(data)
-    label_counts = {}
+    total = len(data)  # Menghitung total jumlah data
+    label_counts = {}  # Menyimpan jumlah setiap label
     for row in data:
-        label = row[-1]
-        label_counts[label] = label_counts.get(label, 0) + 1
-    ent = 0.0
+        label = row[-1]  # Label adalah kolom terakhir (Accepted)
+        label_counts[label] = label_counts.get(label, 0) + 1  # Hitung frekuensi setiap label
+    
+    ent = 0.0  # Variabel untuk menyimpan nilai entropy
     for label in label_counts:
-        prob = label_counts[label] / total
-        ent -= prob * math.log2(prob)
-    return ent
+        prob = label_counts[label] / total  # Probabilitas kemunculan label
+        if prob != 0:  # Menghindari perhitungan log(0) yang tidak terdefinisi
+            ent -= prob * math.log2(prob)  # Rumus entropy Shannon
+    return round(ent, 4)
 
-# Memisahkan data berdasarkan nilai fitur tertentu
+# Fungsi untuk membagi data berdasarkan nilai fitur tertentu
 def split_data(data, feature_index, value):
-    subset = []
+    subset = []  # Menyimpan subset data berdasarkan nilai fitur
     for row in data:
-        if row[feature_index] == value:
-            reduced_row = row[:feature_index] + row[feature_index + 1:]
+        if row[feature_index] == value:  # Memilih data yang memiliki nilai fitur yang sama
+            reduced_row = row[:feature_index] + row[feature_index + 1:]  # Menghapus fitur yang sedang dipertimbangkan
             subset.append(reduced_row)
     return subset
 
-# Menentukan fitur terbaik dengan information gain
-def best_split(data):
-    base_entropy = entropy(data)
-    best_gain = 0
-    best_feature = -1
-    num_features = len(data[0]) - 1
-    for i in range(num_features):
-        values = set(row[i] for row in data)
-        new_entropy = 0.0
-        for val in values:
-            subset = split_data(data, i, val)
-            prob = len(subset) / len(data)
-            new_entropy += prob * entropy(subset)
-        info_gain = base_entropy - new_entropy
-        if info_gain > best_gain:
-            best_gain = info_gain
-            best_feature = i
-    return best_feature
+# Fungsi untuk menghitung Information Gain dari suatu fitur
+def information_gain(data, feature_index, base_entropy):
+    feature_values = set(row[feature_index] for row in data)  # Nilai unik dari fitur yang dipilih
+    new_entropy = 0.0  # Variabel untuk menyimpan entropy baru setelah membagi data
+    
+    # Menghitung entropy setelah membagi data berdasarkan nilai fitur
+    for value in feature_values:
+        subset = split_data(data, feature_index, value)  # Data subset berdasarkan nilai fitur
+        prob = len(subset) / len(data)  # Probabilitas subset
+        new_entropy += prob * entropy(subset)  # Menambahkan entropy subset ke dalam total entropy baru
+    
+    # Menghitung Information Gain
+    return round(base_entropy - new_entropy, 4)
 
-# Membangun tree rekursif
-def build_tree(data, labels):
-    class_list = [row[-1] for row in data]
-    if class_list.count(class_list[0]) == len(class_list):
-        return class_list[0]
-    if len(data[0]) == 1:
-        return max(set(class_list), key=class_list.count)
+# Fungsi untuk menampilkan perhitungan entropy dari sebuah fitur
+def calculate_feature_entropy(data, feature_values, feature_name, feature_index):
+    print(f"{feature_name}:")
+    feature_entropy = {}
+    for value in feature_values:
+        subset = [row for row in data if row[feature_index] == value]  # Use correct feature index
+        feature_entropy[value] = entropy(subset)
+        yes_value = sum([1 for row in subset if row[-1] == 'Yes'])
+        no_value = len(subset) - yes_value
+        print(f"Kolom {value}:")
+        print(f"Yes: {yes_value}/{len(subset)}")
+        print(f"No: {no_value}/{len(subset)}")
+        print(f"Entropy {value}: {feature_entropy[value]}")
+    return feature_entropy
 
-    best_feat = best_split(data)
-    best_feat_label = labels[best_feat]
-    tree = {best_feat_label: {}}
-    feat_values = set(row[best_feat] for row in data)
-    for value in feat_values:
-        sub_labels = labels[:best_feat] + labels[best_feat + 1:]
-        sub_data = split_data(data, best_feat, value)
-        subtree = build_tree(sub_data, sub_labels)
-        tree[best_feat_label][value] = subtree
+# Fungsi untuk menghitung weighted entropy dan information gain berdasarkan perhitungan entropy fitur
+def calculate_weighted_entropy(data, feature_values, feature_entropy):
+    weighted_entropy = sum([(len([row for row in data if row[0] == value]) / len(data)) * feature_entropy[value] for value in feature_values])
+    return weighted_entropy
+
+# Fungsi untuk menghitung informasi gain berdasarkan entropy per fitur
+def calculate_information_gain(base_entropy, weighted_entropy):
+    return round(base_entropy - weighted_entropy, 4)
+
+# Fungsi untuk membangun decision tree menggunakan ID3
+def id3(data, features):
+    labels = [row[-1] for row in data]
+    if len(set(labels)) == 1:
+        return labels[0]
+
+    if not features:
+        return max(set(labels), key=labels.count)
+
+    gains = [information_gain(data, i, entropy(data)) for i in range(len(features))]
+    best_feature_index = gains.index(max(gains))
+
+    best_feature = features[best_feature_index]
+    tree = {best_feature: {}}
+    feature_values = set(row[best_feature_index] for row in data)
+    sub_features = features[:best_feature_index] + features[best_feature_index + 1:]
+
+    for value in feature_values:
+        subset = [row for row in data if row[best_feature_index] == value]
+        tree[best_feature][value] = id3(subset, sub_features)
+
     return tree
 
-# Fungsi mencetak tree dengan indentasi
+# Fungsi untuk mencetak pohon keputusan dalam format yang mudah dibaca
 def print_tree(tree, indent=""):
     if not isinstance(tree, dict):
         print(indent + "→ " + str(tree))
@@ -71,27 +96,66 @@ def print_tree(tree, indent=""):
             print(indent + "├─" + str(value) + ":")
             print_tree(subtree, indent + "│  ")
 
-# Contoh data dan label
-data = [
-    ['Sunny', 'Hot', 'High', 'Weak', 'No'],
-    ['Sunny', 'Hot', 'High', 'Strong', 'No'],
-    ['Overcast', 'Hot', 'High', 'Weak', 'Yes'],
-    ['Rain', 'Mild', 'High', 'Weak', 'Yes'],
-    ['Rain', 'Cool', 'Normal', 'Weak', 'Yes'],
-    ['Rain', 'Cool', 'Normal', 'Strong', 'No'],
-    ['Overcast', 'Cool', 'Normal', 'Strong', 'Yes'],
-    ['Sunny', 'Mild', 'High', 'Weak', 'No'],
-    ['Sunny', 'Cool', 'Normal', 'Weak', 'Yes'],
-    ['Rain', 'Mild', 'Normal', 'Weak', 'Yes'],
-    ['Sunny', 'Mild', 'Normal', 'Strong', 'Yes'],
-    ['Overcast', 'Mild', 'High', 'Strong', 'Yes'],
-    ['Overcast', 'Hot', 'Normal', 'Weak', 'Yes'],
-    ['Rain', 'Mild', 'High', 'Strong', 'No'],
-    ['Sunny', 'Mild', 'High', 'Strong', 'No']
-]
-labels = ['Outlook', 'Temperature', 'Humidity', 'Wind']
+# Main function
+def main(data, features):
+    # Hitung Entropy untuk kelas "Accepted"
+    base_entropy = entropy(data)
+    yes_count = sum([1 for row in data if row[-1] == 'Yes'])
+    no_count = len(data) - yes_count
 
-# Membangun pohon dan mencetak
-tree = build_tree(data, labels)
-print("Decision Tree:")
-print_tree(tree)
+    # Perhitungan Total Entropy
+    print(f"Perhitungan Total Entropy:")
+    print(f"Yes: {yes_count}/{len(data)}")
+    print(f"No: {no_count}/{len(data)}")
+    print(f"Entropy Class: {base_entropy}\n")
+
+    # kalkulasi Information Gain untuk tiap fitur dan entropy nya
+    gpa_values = ['Good', 'Average', 'Poor']
+    gpa_entropy = calculate_feature_entropy(data, gpa_values, "GPA", 0)
+    weighted_entropy_gpa = calculate_weighted_entropy(data, gpa_values, gpa_entropy)
+    information_gain_gpa = calculate_information_gain(base_entropy, weighted_entropy_gpa)
+
+    print(f"Weighted Entropy GPA: {weighted_entropy_gpa}")
+    print(f"Information Gain GPA: {information_gain_gpa}\n")
+
+    psychology_values = ['Strong', 'Moderate', 'Weak']
+    psychology_entropy = calculate_feature_entropy(data, psychology_values, "Psychology", 1)
+    weighted_entropy_psy = calculate_weighted_entropy(data, psychology_values, psychology_entropy)
+    information_gain_psy = calculate_information_gain(base_entropy, weighted_entropy_psy)
+
+    print(f"Weighted Entropy Psychology: {weighted_entropy_psy}")
+    print(f"Information Gain Psychology: {information_gain_psy}\n")
+
+    interview_values = ['Proper', 'Unsuitable']
+    interview_entropy = calculate_feature_entropy(data, interview_values, "Interview", 2)
+    weighted_entropy_int = calculate_weighted_entropy(data, interview_values, interview_entropy)
+    information_gain_int = calculate_information_gain(base_entropy, weighted_entropy_int)
+
+    print(f"Weighted Entropy Interview: {weighted_entropy_int}")
+    print(f"Information Gain Interview: {information_gain_int}\n")
+
+    # Membangun pohon keputusan menggunakan ID3
+    tree = id3(data, features)
+    print("Pohon Keputusan:")
+    print_tree(tree)
+
+# Data sampel (Fitur: GPA, Psychology, Interview, Target: Accepted)
+data = [
+    ['Good', 'Strong', 'Proper', 'Yes'],
+    ['Good', 'Moderate', 'Proper', 'Yes'],
+    ['Good', 'Moderate', 'Unsuitable', 'Yes'],
+    ['Good', 'Weak', 'Unsuitable', 'No'],
+    ['Average', 'Strong', 'Proper', 'Yes'],
+    ['Average', 'Moderate', 'Proper', 'Yes'],
+    ['Average', 'Moderate', 'Unsuitable', 'Yes'],
+    ['Average', 'Weak', 'Unsuitable', 'No'],
+    ['Poor', 'Strong', 'Proper', 'Yes'],
+    ['Poor', 'Moderate', 'Unsuitable', 'No'],
+    ['Poor', 'Weak', 'Proper', 'Yes'],
+]
+
+# Fitur
+features = ['GPA', 'Psychology', 'Interview']
+
+# Menjalankan program
+main(data, features)
