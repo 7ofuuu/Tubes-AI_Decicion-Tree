@@ -54,9 +54,13 @@ def calculate_feature_entropy(data, feature_values, feature_name, feature_index)
     return feature_entropy
 
 # Fungsi untuk menghitung weighted entropy dan information gain berdasarkan perhitungan entropy fitur
-def calculate_weighted_entropy(data, feature_values, feature_entropy):
-    weighted_entropy = sum([(len([row for row in data if row[0] == value]) / len(data)) * feature_entropy[value] for value in feature_values])
-    return weighted_entropy
+def calculate_weighted_entropy(data, feature_values, feature_entropy, feature_index):
+    weighted_entropy = sum([
+        (len([row for row in data if row[feature_index] == value]) / len(data)) * feature_entropy[value]
+        for value in feature_values
+    ])
+    return round(weighted_entropy, 4)
+
 
 # Fungsi untuk menghitung informasi gain berdasarkan entropy per fitur
 def calculate_information_gain(base_entropy, weighted_entropy):
@@ -112,7 +116,7 @@ def main(data, features):
     # kalkulasi Information Gain untuk tiap fitur dan entropy nya
     gpa_values = ['Good', 'Average', 'Poor']
     gpa_entropy = calculate_feature_entropy(data, gpa_values, "GPA", 0)
-    weighted_entropy_gpa = calculate_weighted_entropy(data, gpa_values, gpa_entropy)
+    weighted_entropy_gpa = calculate_weighted_entropy(data, gpa_values, gpa_entropy, 0)
     information_gain_gpa = calculate_information_gain(base_entropy, weighted_entropy_gpa)
 
     print(f"Weighted Entropy GPA: {weighted_entropy_gpa}")
@@ -120,7 +124,7 @@ def main(data, features):
 
     psychology_values = ['Strong', 'Moderate', 'Weak']
     psychology_entropy = calculate_feature_entropy(data, psychology_values, "Psychology", 1)
-    weighted_entropy_psy = calculate_weighted_entropy(data, psychology_values, psychology_entropy)
+    weighted_entropy_psy = calculate_weighted_entropy(data, psychology_values, psychology_entropy, 1)
     information_gain_psy = calculate_information_gain(base_entropy, weighted_entropy_psy)
 
     print(f"Weighted Entropy Psychology: {weighted_entropy_psy}")
@@ -128,7 +132,7 @@ def main(data, features):
 
     interview_values = ['Proper', 'Unsuitable']
     interview_entropy = calculate_feature_entropy(data, interview_values, "Interview", 2)
-    weighted_entropy_int = calculate_weighted_entropy(data, interview_values, interview_entropy)
+    weighted_entropy_int = calculate_weighted_entropy(data, interview_values, interview_entropy, 2)
     information_gain_int = calculate_information_gain(base_entropy, weighted_entropy_int)
 
     print(f"Weighted Entropy Interview: {weighted_entropy_int}")
